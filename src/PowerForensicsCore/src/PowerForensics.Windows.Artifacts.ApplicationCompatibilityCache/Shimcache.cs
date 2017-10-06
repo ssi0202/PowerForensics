@@ -6,7 +6,7 @@ using PowerForensics.Windows.Registry;
 namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     public class Shimcache
     {
@@ -18,28 +18,29 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
         //internal const uint WIN8_MAGIC = ;
         internal const uint WIN8dot1_MAGIC = 0x00000080;
         internal const uint WIN10_MAGIC = 0x00000030;
+        internal const uint WIN10Creators_MAGIC = 0x00000034;
 
         #endregion Constants
 
         #region Properties
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public readonly string Path;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public readonly DateTime LastModifiedTime;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public readonly ulong FileSize;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public readonly DateTime LastUpdateTime;
 
@@ -60,7 +61,7 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
         #region Static Methods
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="volume"></param>
         /// <returns></returns>
@@ -71,7 +72,7 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="hivePath"></param>
         /// <returns></returns>
@@ -98,7 +99,7 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
                         throw new Exception("Error finding AppCompatCache registry value");
                     }
                 }
-                
+
                 byte[] bytes = (byte[])vk.GetData();
 
                 string arch = (string)ValueKey.Get(hivePath, @"ControlSet001\Control\Session Manager\Environment", "PROCESSOR_ARCHITECTURE").GetData();
@@ -114,13 +115,16 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
                     // Windows 7 and Server 2008 R2
                     case NT6dot1_MAGIC:
                         return GetBADC0FEE(bytes, arch);
-                    // Windows 8 
+                    // Windows 8
                     // Windows 8.1
                     case WIN8dot1_MAGIC:
                         return Get00000080(bytes);
                     // Windows 10
                     case WIN10_MAGIC:
                         return Get00000030(bytes);
+                    // Windows 10
+                    case WIN10Creators_MAGIC:
+                        return Get00000034(bytes);
                     default:
                         return null;
                 }
@@ -274,7 +278,34 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
 
             return shimList.ToArray();
         }
-        
+
+        private static Shimcache[] Get00000034(byte[] bytes)
+        {
+            int offset = BitConverter.ToInt32(bytes, 0x00);
+            List<Shimcache> shimList = new List<Shimcache>();
+
+            while (offset < bytes.Length)
+            {
+                if (Encoding.ASCII.GetString(bytes, offset, 0x04) == "10ts")
+                {
+                    int pathoffset = offset + 0x0E;
+                    int pathlength = BitConverter.ToInt16(bytes, offset + 0x0C);
+                    string path = Encoding.Unicode.GetString(bytes, pathoffset, pathlength);
+                    DateTime lastModifiedTime = DateTime.FromFileTimeUtc(BitConverter.ToInt64(bytes, pathoffset + pathlength));
+
+                    shimList.Add(new Shimcache(path, lastModifiedTime, 0, new DateTime(0)));
+
+                    offset += (BitConverter.ToInt32(bytes, offset + 0x08) + 0x0C);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return shimList.ToArray();
+        }
+
         #endregion Static Methods
     }
 }
