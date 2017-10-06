@@ -122,7 +122,7 @@ namespace PowerForensics.Windows.Artifacts.ApplicationCompatibilityCache
                     // Windows 10
                     case WIN10_MAGIC:
                         return Get00000030(bytes);
-                    // Windows 10
+                    // Windows 10 Creators
                     case WIN10Creators_MAGIC:
                         return Get00000034(bytes);
                     default:
